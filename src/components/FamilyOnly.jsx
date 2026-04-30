@@ -133,7 +133,7 @@ function buildInsights(week) {
     warnings.push({ icon: '💊', text: `Medication taken only ${medAdherence}% of the time this week. Missed meds can destabilize mood — a soft mention may help.` })
   }
   if (mindCounts.gohan >= 4) {
-    warnings.push({ icon: '🔥', text: 'He's been in Emotional Mind most of this week. He may be overwhelmed — showing up without expectations is helpful.' })
+    warnings.push({ icon: '🔥', text: "He's been in Emotional Mind most of this week. He may be overwhelmed — showing up without expectations is helpful." })
   }
 
   return { avgMood, moodTrend, moodTrendColor, goodSleepNights, lowSleepNights, consecutiveLowSleep, medAdherence, mindCounts, warnings }
