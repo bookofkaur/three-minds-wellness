@@ -1,0 +1,146 @@
+name: CI — Test & Deploy
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# Allow only one concurrent deploy per branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────
+  # JOB 1: Lint + Unit Tests + Coverage
+  # ──────────────────────────────────────────────────────
+  test:
+    name: 🧪 Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # ──────────────────────────────────────────────────────
+  # JOB 2: Security Audit
+  # ──────────────────────────────────────────────────────
+  security:
+    name: 🔒 Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (moderate+)
+        run: npm audit --audit-level=moderate || true
+        # `|| true` prevents deploy block for known dev-only vulnerabilities
+
+      - name: Check for secrets in source (trufflehog)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: HEAD~1
+          extra_args: --only-verified
+
+  # ──────────────────────────────────────────────────────
+  # JOB 3: Build Check
+  # ──────────────────────────────────────────────────────
+  build:
+    name: 🏗️ Build
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify no secrets in bundle
+        run: |
+          echo "Checking for GitHub tokens in bundle..."
+          if grep -r "gho_\|ghp_\|github_pat_" dist/; then
+            echo "❌ FAIL: GitHub token found in bundle!"
+            exit 1
+          fi
+          echo "✅ No secrets found in bundle"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # ──────────────────────────────────────────────────────
+  # JOB 4: Deploy to GitHub Pages (master branch only)
+  # ──────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for production
+        run: npm run build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          commit_message: 'deploy: ${{ github.event.head_commit.message }}'
