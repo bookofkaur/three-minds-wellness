@@ -99,7 +99,7 @@ export default function Dashboard({ onNavigate, VIEWS, showToast }) {
           <span className="alert-icon">🚨</span>
           <div className="alert-text" style={{ flex: 1 }}>
             <h4>Support Signal Active</h4>
-            <p>Josh and Shenita can see you need support.</p>
+            <p>Jacoby and Shenita can see you need support.</p>
           </div>
           <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 12px' }} onClick={clearDistress}>I'm OK</button>
         </div>
@@ -207,7 +207,7 @@ export default function Dashboard({ onNavigate, VIEWS, showToast }) {
       <div className="card">
         <div className="card-title">🆘 Need Support?</div>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
-          One tap signals Josh and Shenita. No explanation needed.
+          One tap signals Jacoby and Shenita. No explanation needed.
         </p>
         {distress?.active ? (
           <button className="btn-secondary" style={{ width: '100%' }} onClick={clearDistress}>✅ I'm okay now — clear signal</button>

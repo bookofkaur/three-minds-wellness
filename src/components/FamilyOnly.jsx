@@ -205,7 +205,7 @@ export default function FamilyOnly({ showToast }) {
         <div className="card-title">📞 Primary Contacts</div>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 14 }}>Coordinate here if you need to loop others in:</p>
         {[
-          { initials: 'J', name: 'Josh', role: 'Close friend · Primary contact', color: 'linear-gradient(135deg, #ff6b35, #ff9f1c)' },
+          { initials: 'J', name: 'Jacoby', role: 'Close friend · Primary contact', color: 'linear-gradient(135deg, #ff6b35, #ff9f1c)' },
           { initials: 'S', name: 'Shenita', role: 'Trusted support · Primary contact', color: 'linear-gradient(135deg, #2d6a4f, #52b788)' },
         ].map(c => (
           <div key={c.name} className="contact-card">

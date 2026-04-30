@@ -101,7 +101,7 @@ export default function FamilyView({ showToast }) {
       <div className="card" style={{ background: 'rgba(82,183,136,0.08)', borderColor: 'var(--shika-secondary)' }}>
         <div className="card-title">🔗 Family Share Link</div>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
-          Share this exact URL with Josh, Shenita, and your circle. They only see status — no Check In option:
+          Share this exact URL with Jacoby, Shenita, and your circle. They only see status — no Check In option:
         </p>
         <div style={{
           background: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: '14px 16px',
@@ -126,7 +126,7 @@ export default function FamilyView({ showToast }) {
       <div className="card">
         <div className="card-title">📞 Trusted Contacts</div>
         {[
-          { initials: 'J', name: 'Josh', role: 'Close friend · Primary contact', color: 'linear-gradient(135deg, #ff6b35, #ff9f1c)' },
+          { initials: 'J', name: 'Jacoby', role: 'Close friend · Primary contact', color: 'linear-gradient(135deg, #ff6b35, #ff9f1c)' },
           { initials: 'S', name: 'Shenita', role: 'Trusted support · Primary contact', color: 'linear-gradient(135deg, #2d6a4f, #52b788)' },
         ].map(c => (
           <div key={c.name} className="contact-card">
