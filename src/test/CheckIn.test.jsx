@@ -80,12 +80,16 @@ describe('CheckIn component', () => {
     })
   })
 
-  it('renders all 5 medication checkboxes', () => {
+  it('renders all 7 medication checkboxes', () => {
     renderCheckIn()
+    // Prescribed meds
     expect(screen.getByText('Mirtazapine')).toBeInTheDocument()
     expect(screen.getByText('Atomoxetine')).toBeInTheDocument()
-    expect(screen.getByText('Vitamin D')).toBeInTheDocument()
+    expect(screen.getByText(/Oxcarbazepine/)).toBeInTheDocument()
+    // Optional supplements
+    expect(screen.getByText('Magnesium Citrate')).toBeInTheDocument()
+    expect(screen.getByText("Lion's Mane")).toBeInTheDocument()
+    expect(screen.getByText('Vitamin D3')).toBeInTheDocument()
     expect(screen.getByText('Fish Oil')).toBeInTheDocument()
-    expect(screen.getByText('Magnesium')).toBeInTheDocument()
   })
 })

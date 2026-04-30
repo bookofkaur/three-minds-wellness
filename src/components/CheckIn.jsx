@@ -7,20 +7,37 @@ const MINDS = [
   { id: 'shika', emoji: '🧠', name: 'Shikamaru', subtitle: 'Logical Mind', desc: 'Analytical. Detached. Chess mode.', cls: 'selected-shika' },
 ]
 
-const MEDS = [
-  { id: 'mirtazapine', label: 'Mirtazapine', type: 'Rx · Mood + Sleep' },
-  { id: 'atomoxetine', label: 'Atomoxetine', type: 'Rx · ADHD' },
-  { id: 'vitaminD', label: 'Vitamin D', type: 'Supplement' },
-  { id: 'fishOil', label: 'Fish Oil', type: 'Supplement · Omega-3' },
-  { id: 'magnesium', label: 'Magnesium', type: 'Supplement · Sleep + Anxiety' },
+// Prescribed meds — these MUST be taken daily. Counted in adherence %.
+export const PRESCRIBED_MEDS = [
+  { id: 'mirtazapine',   label: 'Mirtazapine',        type: 'Rx · Mood + Sleep' },
+  { id: 'atomoxetine',   label: 'Atomoxetine',         type: 'Rx · ADHD' },
+  { id: 'oxcarbazepine', label: 'Oxcarbazepine (Trileptal)', type: 'Rx · Mood Stabilizer' },
 ]
+
+// Optional supplements — good to take but not required every day.
+export const OPTIONAL_SUPPLEMENTS = [
+  { id: 'magnesiumCitrate', label: 'Magnesium Citrate', type: 'Supplement · Sleep + Anxiety' },
+  { id: 'lionsMane',        label: "Lion's Mane",        type: 'Supplement · Brain Health' },
+  { id: 'vitaminD3',        label: 'Vitamin D3',          type: 'Supplement · Mood' },
+  { id: 'fishOil',          label: 'Fish Oil',             type: 'Supplement · Omega-3' },
+]
+
+const DEFAULT_MEDS = {
+  mirtazapine: false,
+  atomoxetine: false,
+  oxcarbazepine: false,
+  magnesiumCitrate: false,
+  lionsMane: false,
+  vitaminD3: false,
+  fishOil: false,
+}
 
 export default function CheckIn({ onNavigate, VIEWS, showToast }) {
   const [mind, setMind] = useState(null)
   const [mood, setMood] = useState(7)
   const [energy, setEnergy] = useState(6)
   const [sleepHours, setSleepHours] = useState(7)
-  const [meds, setMeds] = useState({ mirtazapine: false, atomoxetine: false, vitaminD: false, fishOil: false, magnesium: false })
+  const [meds, setMeds] = useState(DEFAULT_MEDS)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -103,10 +120,31 @@ export default function CheckIn({ onNavigate, VIEWS, showToast }) {
         </div>
       </div>
 
+      {/* Prescribed Meds */}
       <div className="card">
-        <div className="card-title">💊 Meds Taken Today?</div>
+        <div className="card-title">💊 Prescribed Meds</div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 12 }}>
+          These need to be taken daily — check off what you took.
+        </p>
         <div className="med-list">
-          {MEDS.map(med => (
+          {PRESCRIBED_MEDS.map(med => (
+            <div key={med.id} className="med-item" onClick={() => toggleMed(med.id)}>
+              <input type="checkbox" id={med.id} checked={meds[med.id]}
+                onChange={() => toggleMed(med.id)} onClick={e => e.stopPropagation()} />
+              <label htmlFor={med.id}>
+                {med.label}<br /><span className="med-type">{med.type}</span>
+              </label>
+              {meds[med.id] && <span style={{ fontSize: 18 }}>✅</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Optional Supplements */}
+      <div className="card">
+        <div className="card-title">🌿 Supplements <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-secondary)', marginLeft: 6 }}>(optional — not required daily)</span></div>
+        <div className="med-list">
+          {OPTIONAL_SUPPLEMENTS.map(med => (
             <div key={med.id} className="med-item" onClick={() => toggleMed(med.id)}>
               <input type="checkbox" id={med.id} checked={meds[med.id]}
                 onChange={() => toggleMed(med.id)} onClick={e => e.stopPropagation()} />

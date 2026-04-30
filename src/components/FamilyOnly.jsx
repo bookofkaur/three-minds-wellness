@@ -52,12 +52,38 @@ function get7DayCheckins(checkins) {
   return checkins.filter(c => new Date(c.timestamp) >= cutoff)
 }
 
-function getMedStatus(meds) {
+// Only prescribed meds count toward adherence — not optional supplements
+const PRESCRIBED_IDS = ['mirtazapine', 'atomoxetine', 'oxcarbazepine']
+const PRESCRIBED_LABELS = {
+  mirtazapine:   'Mirtazapine',
+  atomoxetine:   'Atomoxetine',
+  oxcarbazepine: 'Oxcarbazepine',
+}
+
+function getPrescribedMedRows(meds) {
+  if (!meds) return []
+  return PRESCRIBED_IDS.map(id => ({
+    id,
+    label: PRESCRIBED_LABELS[id],
+    taken: !!meds[id],
+  }))
+}
+
+function getPrescribedAdherence(meds) {
+  if (!meds) return null
+  const rows = getPrescribedMedRows(meds)
+  if (!rows.length) return null
+  const taken = rows.filter(r => r.taken).length
+  return { taken, total: rows.length }
+}
+
+function getMedSummaryLabel(meds) {
   if (!meds) return { label: '—', color: 'var(--text-secondary)' }
-  const vals = Object.values(meds)
-  if (vals.every(Boolean)) return { label: '✅ All Taken', color: 'var(--green)' }
-  if (vals.some(Boolean)) return { label: '⚠️ Partial', color: 'var(--yellow)' }
-  return { label: '❌ None', color: 'var(--red)' }
+  const adh = getPrescribedAdherence(meds)
+  if (!adh) return { label: '—', color: 'var(--text-secondary)' }
+  if (adh.taken === adh.total) return { label: `✅ All ${adh.total} taken`, color: 'var(--green)' }
+  if (adh.taken === 0) return { label: '❌ None taken', color: 'var(--red)' }
+  return { label: `⚠️ ${adh.taken}/${adh.total} taken`, color: 'var(--yellow)' }
 }
 
 function buildInsights(week) {
@@ -82,10 +108,13 @@ function buildInsights(week) {
     return max
   })()
 
-  // Medication adherence
-  const medsCheckins = week.filter(c => c.meds && Object.values(c.meds).length > 0)
+  // Medication adherence — prescribed meds only (mirtazapine, atomoxetine, oxcarbazepine)
+  const PRESCRIBED = ['mirtazapine', 'atomoxetine', 'oxcarbazepine']
+  const medsCheckins = week.filter(c => c.meds)
   const medAdherence = medsCheckins.length
-    ? Math.round((medsCheckins.filter(c => Object.values(c.meds).every(Boolean)).length / medsCheckins.length) * 100)
+    ? Math.round(
+        medsCheckins.filter(c => PRESCRIBED.every(id => !!c.meds[id])).length / medsCheckins.length * 100
+      )
     : null
 
   // Mind state breakdown
@@ -216,11 +245,17 @@ export default function FamilyOnly({ showToast }) {
                   {latest.sleepHours}h {parseFloat(latest.sleepHours) < 5 ? '⚠️' : ''}
                 </span>
               </div>
-              <div className="stat-row">
-                <span className="stat-label">Meds</span>
-                <span className="stat-value" style={{ color: getMedStatus(latest.meds).color }}>
-                  {getMedStatus(latest.meds).label}
-                </span>
+              {/* Individual prescribed meds */}
+              <div style={{ paddingTop: 8 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Prescribed Meds</div>
+                {getPrescribedMedRows(latest.meds).map(row => (
+                  <div key={row.id} className="stat-row" style={{ paddingTop: 4, paddingBottom: 4 }}>
+                    <span className="stat-label" style={{ fontSize: 13 }}>{row.label}</span>
+                    <span className="stat-value" style={{ fontSize: 13, color: row.taken ? 'var(--green)' : 'var(--red)' }}>
+                      {row.taken ? '✅ Taken' : '❌ Not taken'}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </>
@@ -345,45 +380,35 @@ export default function FamilyOnly({ showToast }) {
           </p>
           {week.map((c, i) => {
             const m = MINDS[c.mind]
-            const medSt = getMedStatus(c.meds)
+            const medSt = getMedSummaryLabel(c.meds)
             return (
               <div key={i} style={{
                 display: 'flex', gap: 12, padding: '12px 0',
                 borderBottom: i < week.length - 1 ? '1px solid var(--card-border)' : 'none',
                 alignItems: 'flex-start'
               }}>
-                {/* Mind emoji */}
                 <div style={{ fontSize: 22, flexShrink: 0, marginTop: 2 }}>{m ? m.emoji : '❓'}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* Timestamp */}
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
                     {formatDateTime(c.timestamp)}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6 }}>{timeSince(c.timestamp)}</div>
-                  {/* Stats row */}
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{
                       fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 20,
                       background: c.mood >= 7 ? 'rgba(82,183,136,0.15)' : c.mood >= 5 ? 'rgba(255,184,0,0.15)' : 'rgba(230,57,70,0.15)',
                       color: c.mood >= 7 ? 'var(--green)' : c.mood >= 5 ? 'var(--yellow)' : 'var(--red)'
-                    }}>
-                      😊 Mood {c.mood}/10
-                    </span>
+                    }}>😊 {c.mood}/10</span>
                     <span style={{
                       fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 20,
                       background: parseFloat(c.sleepHours) >= 7 ? 'rgba(82,183,136,0.15)' : parseFloat(c.sleepHours) >= 5 ? 'rgba(255,184,0,0.15)' : 'rgba(230,57,70,0.15)',
                       color: parseFloat(c.sleepHours) >= 7 ? 'var(--green)' : parseFloat(c.sleepHours) >= 5 ? 'var(--yellow)' : 'var(--red)'
-                    }}>
-                      😴 {c.sleepHours}h sleep
-                    </span>
+                    }}>😴 {c.sleepHours}h</span>
+                    {/* Prescribed meds summary badge */}
                     <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.07)', color: medSt.color }}>
                       💊 {medSt.label}
                     </span>
-                    {m && (
-                      <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: m.color + '22', color: m.color }}>
-                        {m.emoji} {m.name}
-                      </span>
-                    )}
+                    {m && <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: m.color + '22', color: m.color }}>{m.emoji} {m.name}</span>}
                   </div>
                 </div>
               </div>
@@ -500,9 +525,10 @@ export default function FamilyOnly({ showToast }) {
           If he's skipping medications, that's an early warning sign worth mentioning gently — not as a lecture, just as a caring nudge:
         </p>
         {[
-          { name: 'Mirtazapine', role: 'Mood + sleep stabilizer', note: 'Missing doses disrupts sleep — which triggers mood episodes. Most important one to keep consistent.' },
-          { name: 'Atomoxetine', role: 'ADHD (non-stimulant)', note: 'Supports focus and impulse control throughout the day. Helps him stay on track with tasks and goals.' },
-          { name: 'Vitamin D · Fish Oil · Magnesium', role: 'Supplements', note: 'Brain health and sleep quality — small but consistent habit that adds up over time.' },
+          { name: 'Mirtazapine', role: 'Rx · Mood + sleep stabilizer', note: 'Missing doses disrupts sleep — which triggers mood episodes. Most important one to keep consistent.' },
+          { name: 'Atomoxetine', role: 'Rx · ADHD (non-stimulant)', note: 'Supports focus and impulse control throughout the day. Helps him stay on track with tasks and goals.' },
+          { name: 'Oxcarbazepine (Trileptal)', role: 'Rx · Mood stabilizer', note: 'Helps prevent manic and depressive mood swings. Skipping this is a significant early warning sign.' },
+          { name: 'Magnesium Citrate · Lion\'s Mane · Vitamin D3 · Fish Oil', role: 'Optional supplements', note: 'Brain health and sleep quality — beneficial but not required every single day.' },
         ].map(m => (
           <div key={m.name} style={{ marginBottom: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '14px 16px' }}>
             <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 2 }}>{m.name}</div>

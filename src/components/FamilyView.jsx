@@ -46,12 +46,21 @@ function get7DayCheckins(checkins) {
   return checkins.filter(c => new Date(c.timestamp) >= cutoff)
 }
 
-function getMedStatus(meds) {
+const PRESCRIBED_IDS = ['mirtazapine', 'atomoxetine', 'oxcarbazepine']
+const PRESCRIBED_LABELS = { mirtazapine: 'Mirtazapine', atomoxetine: 'Atomoxetine', oxcarbazepine: 'Oxcarbazepine' }
+
+function getPrescribedMedRows(meds) {
+  if (!meds) return []
+  return PRESCRIBED_IDS.map(id => ({ id, label: PRESCRIBED_LABELS[id], taken: !!meds[id] }))
+}
+
+function getMedSummaryLabel(meds) {
   if (!meds) return { label: '—', color: 'var(--text-secondary)' }
-  const vals = Object.values(meds)
-  if (vals.every(Boolean)) return { label: '✅ All Taken', color: 'var(--green)' }
-  if (vals.some(Boolean)) return { label: '⚠️ Partial', color: 'var(--yellow)' }
-  return { label: '❌ None', color: 'var(--red)' }
+  const rows = getPrescribedMedRows(meds)
+  const taken = rows.filter(r => r.taken).length
+  if (taken === rows.length) return { label: `✅ All 3 taken`, color: 'var(--green)' }
+  if (taken === 0) return { label: '❌ None taken', color: 'var(--red)' }
+  return { label: `⚠️ ${taken}/3 taken`, color: 'var(--yellow)' }
 }
 
 function buildInsights(week) {
@@ -70,9 +79,10 @@ function buildInsights(week) {
     }
     return max
   })()
-  const medsCheckins = week.filter(c => c.meds && Object.values(c.meds).length > 0)
+  const PRESCRIBED = ['mirtazapine', 'atomoxetine', 'oxcarbazepine']
+  const medsCheckins = week.filter(c => c.meds)
   const medAdherence = medsCheckins.length
-    ? Math.round((medsCheckins.filter(c => Object.values(c.meds).every(Boolean)).length / medsCheckins.length) * 100)
+    ? Math.round(medsCheckins.filter(c => PRESCRIBED.every(id => !!c.meds[id])).length / medsCheckins.length * 100)
     : null
   const mindCounts = { gohan: 0, luffy: 0, shika: 0 }
   week.forEach(c => { if (mindCounts[c.mind] !== undefined) mindCounts[c.mind]++ })
@@ -156,8 +166,8 @@ export default function FamilyView({ showToast }) {
               </div>
               <div className="stat-row">
                 <span className="stat-label">Medications</span>
-                <span className="stat-value" style={{ color: getMedStatus(latest.meds).color }}>
-                  {getMedStatus(latest.meds).label}
+                <span className="stat-value" style={{ color: getMedSummaryLabel(latest.meds).color }}>
+                  {getMedSummaryLabel(latest.meds).label}
                 </span>
               </div>
             </div>
@@ -230,7 +240,7 @@ export default function FamilyView({ showToast }) {
           <div className="card-title">📅 Last 7 Days — History</div>
           {week.map((c, i) => {
             const m = MINDS[c.mind]
-            const medSt = getMedStatus(c.meds)
+            const medSt = getMedSummaryLabel(c.meds)
             return (
               <div key={i} style={{
                 display: 'flex', gap: 10, padding: '10px 0',
