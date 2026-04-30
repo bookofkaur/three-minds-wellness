@@ -1,0 +1,232 @@
+import { useState } from 'react'
+import { saveCheckin } from '../App'
+
+const MINDS = [
+  {
+    id: 'gohan',
+    emoji: '🔥',
+    name: 'Gohan',
+    subtitle: 'Emotional Mind',
+    desc: 'Feelings are loud. Reactive, passionate, intense.',
+    cls: 'selected-gohan',
+  },
+  {
+    id: 'luffy',
+    emoji: '⚓',
+    name: 'Joyboy',
+    subtitle: 'Middle Mind',
+    desc: 'Balanced. Present. Trust your gut.',
+    cls: 'selected-luffy',
+  },
+  {
+    id: 'shika',
+    emoji: '🧠',
+    name: 'Shikamaru',
+    subtitle: 'Logical Mind',
+    desc: 'Analytical. Detached. Chess mode.',
+    cls: 'selected-shika',
+  },
+]
+
+const MEDS = [
+  { id: 'mirtazapine', label: 'Mirtazapine', type: 'Rx · Mood + Sleep' },
+  { id: 'atomoxetine', label: 'Atomoxetine', type: 'Rx · ADHD' },
+  { id: 'vitaminD', label: 'Vitamin D', type: 'Supplement' },
+  { id: 'fishOil', label: 'Fish Oil', type: 'Supplement · Omega-3' },
+  { id: 'magnesium', label: 'Magnesium', type: 'Supplement · Sleep + Anxiety' },
+]
+
+export default function CheckIn({ onNavigate, VIEWS, showToast }) {
+  const [mind, setMind] = useState(null)
+  const [mood, setMood] = useState(7)
+  const [energy, setEnergy] = useState(6)
+  const [sleepHours, setSleepHours] = useState(7)
+  const [meds, setMeds] = useState({
+    mirtazapine: false,
+    atomoxetine: false,
+    vitaminD: false,
+    fishOil: false,
+    magnesium: false,
+  })
+  const [notes, setNotes] = useState('')
+
+  const toggleMed = (id) => setMeds(prev => ({ ...prev, [id]: !prev[id] }))
+
+  const moodEmoji = (v) => {
+    if (v <= 2) return '😞'
+    if (v <= 4) return '😕'
+    if (v <= 6) return '😐'
+    if (v <= 8) return '🙂'
+    return '😄'
+  }
+
+  const energyEmoji = (v) => {
+    if (v <= 3) return '🪫'
+    if (v <= 6) return '⚡'
+    return '🔋'
+  }
+
+  const handleSubmit = () => {
+    if (!mind) {
+      showToast('⚠️ Pick your active mind first')
+      return
+    }
+    saveCheckin({ mind, mood, energy, sleepHours, meds, notes })
+    showToast('✅ Check-in saved. You showed up.')
+    setTimeout(() => onNavigate(VIEWS.DASHBOARD), 800)
+  }
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h1>CHECK IN</h1>
+        <p>60 seconds. Honest answers. No judgment.</p>
+      </div>
+
+      {/* Three Minds Selector */}
+      <div className="card">
+        <div className="card-title">🧬 Which Mind Is Active?</div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 14 }}>
+          Not who you want to be right now — who you actually ARE right now.
+        </p>
+        <div className="mind-grid">
+          {MINDS.map(m => (
+            <button
+              key={m.id}
+              className={`mind-card ${mind === m.id ? m.cls : ''}`}
+              onClick={() => setMind(m.id)}
+            >
+              <span className="mind-emoji">{m.emoji}</span>
+              <span className="mind-name">{m.name}</span>
+              <span className="mind-subtitle">{m.subtitle}</span>
+            </button>
+          ))}
+        </div>
+        {mind && (
+          <div style={{
+            background: 'rgba(255,255,255,0.04)',
+            borderRadius: 12,
+            padding: '12px 14px',
+            fontSize: 13,
+            color: 'var(--text-secondary)',
+            marginTop: 4
+          }}>
+            {MINDS.find(m => m.id === mind)?.desc}
+          </div>
+        )}
+      </div>
+
+      {/* Sleep */}
+      <div className="card">
+        <div className="card-title">😴 Sleep Last Night</div>
+        <div className="sleep-input-row">
+          <input
+            type="number"
+            min="0"
+            max="24"
+            step="0.5"
+            value={sleepHours}
+            onChange={e => setSleepHours(parseFloat(e.target.value) || 0)}
+          />
+          <span style={{ color: 'var(--text-secondary)', fontSize: 14, fontWeight: 700 }}>hours</span>
+        </div>
+        {sleepHours < 5 && (
+          <p className="sleep-warning">⚠️ Under 5hrs is a mood episode risk factor. Be easy on yourself today.</p>
+        )}
+        {sleepHours >= 7 && (
+          <p className="sleep-note" style={{ color: 'var(--green)' }}>✅ Solid sleep. Your brain is working with you.</p>
+        )}
+        {sleepHours >= 5 && sleepHours < 7 && (
+          <p className="sleep-note">Getting there. Aim for 7-9hrs when you can.</p>
+        )}
+      </div>
+
+      {/* Mood */}
+      <div className="card">
+        <div className="card-title">{moodEmoji(mood)} Mood</div>
+        <div className="slider-group">
+          <div className="slider-label">
+            <span>How are you actually feeling?</span>
+            <span className="slider-value">{mood}/10</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={mood}
+            onChange={e => setMood(parseInt(e.target.value))}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
+            <span>Not great</span>
+            <span>Amazing</span>
+          </div>
+        </div>
+
+        <hr className="section-divider" />
+
+        <div className="slider-group" style={{ marginBottom: 0 }}>
+          <div className="slider-label">
+            <span>{energyEmoji(energy)} Energy Level</span>
+            <span className="slider-value">{energy}/10</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={energy}
+            onChange={e => setEnergy(parseInt(e.target.value))}
+            style={{ '--thumb-color': 'var(--shika-secondary)' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
+            <span>Drained</span>
+            <span>Charged</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Medications */}
+      <div className="card">
+        <div className="card-title">💊 Meds Taken Today?</div>
+        <div className="med-list">
+          {MEDS.map(med => (
+            <div key={med.id} className="med-item" onClick={() => toggleMed(med.id)}>
+              <input
+                type="checkbox"
+                id={med.id}
+                checked={meds[med.id]}
+                onChange={() => toggleMed(med.id)}
+                onClick={e => e.stopPropagation()}
+              />
+              <label htmlFor={med.id}>
+                {med.label}
+                <br />
+                <span className="med-type">{med.type}</span>
+              </label>
+              {meds[med.id] && <span style={{ fontSize: 18 }}>✅</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div className="card">
+        <div className="card-title">📝 Notes (Optional)</div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 12 }}>
+          What's on your mind? Racing thoughts, wins, worries — anything.
+        </p>
+        <textarea
+          rows={4}
+          placeholder="Write freely. This is private..."
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+        />
+      </div>
+
+      <button className="btn-primary" onClick={handleSubmit}>
+        💾 SAVE CHECK-IN
+      </button>
+
+      <div style={{ height: 8 }} />
+    </div>
+  )
+}
