@@ -1,11 +1,14 @@
-// Firebase Realtime Database — lightweight REST wrapper (no SDK needed)
-// The DB_URL is NOT a secret — it's a public identifier, security is via Rules.
-// Rules are set to public read/write for this MVP.
+// JSONBlob — cross-device data store (no token, no auth, no revocation ever)
+// Read/write via public REST API using a UUID blob identifier (not a secret).
+// Blob ID: 019ddd44-3ab5-7590-8dec-b4f80a11210c
+// API: GET/PUT https://jsonblob.com/api/jsonBlob/{ID}
 
-// Vite replaces import.meta.env.VITE_DB_URL at build time
-export const DB_URL = (import.meta.env.VITE_DB_URL || '').replace(/\/$/, '')
+const BLOB_ID = '019ddd44-3ab5-7590-8dec-b4f80a11210c'
+const BLOB_URL = `https://jsonblob.com/api/jsonBlob/${BLOB_ID}`
+const HEADERS = { 'Content-Type': 'application/json', Accept: 'application/json' }
 
-export const dbConfigured = () => Boolean(DB_URL)
+// Always configured — no env var needed
+export const dbConfigured = () => true
 
 const LS_CHECKINS = 'tm_checkins'
 const LS_DISTRESS = 'tm_distress'
@@ -18,22 +21,34 @@ function lsSet(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)) } catch {}
 }
 
+async function readBlob() {
+  const res = await fetch(BLOB_URL + '?t=' + Date.now(), { headers: HEADERS, cache: 'no-store' })
+  if (!res.ok) throw new Error(`JSONBlob read failed: ${res.status}`)
+  return await res.json()
+}
+
+async function writeBlob(data) {
+  const res = await fetch(BLOB_URL, {
+    method: 'PUT',
+    headers: HEADERS,
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error(`JSONBlob write failed: ${res.status}`)
+}
+
 /* ─── CHECKINS ─────────────────────────────────────────── */
 
 export async function getCheckins() {
-  if (dbConfigured()) {
-    try {
-      const res = await fetch(`${DB_URL}/checkins.json?orderBy="timestamp"`, { cache: 'no-store' })
-      const data = await res.json()
-      if (!data || typeof data !== 'object') return []
-      const list = Object.values(data).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      lsSet(LS_CHECKINS, list)           // cache for offline fallback
-      return list
-    } catch (e) {
-      console.warn('[ThreeMinds] Firebase read failed, using cache:', e.message)
-    }
+  try {
+    const data = await readBlob()
+    if (!data.checkins || typeof data.checkins !== 'object') return []
+    const list = Object.values(data.checkins).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    lsSet(LS_CHECKINS, list) // cache for offline fallback
+    return list
+  } catch (e) {
+    console.warn('[ThreeMinds] JSONBlob read failed, using cache:', e.message)
+    return lsGet(LS_CHECKINS, '[]')
   }
-  return lsGet(LS_CHECKINS, '[]')
 }
 
 export async function saveCheckin(checkin) {
@@ -43,53 +58,41 @@ export async function saveCheckin(checkin) {
   const cached = lsGet(LS_CHECKINS, '[]')
   lsSet(LS_CHECKINS, [record, ...cached].slice(0, 90))
 
-  if (dbConfigured()) {
-    try {
-      await fetch(`${DB_URL}/checkins/${record.id}.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(record),
-      })
-    } catch (e) {
-      console.warn('[ThreeMinds] Firebase write failed, saved locally only:', e.message)
-    }
+  try {
+    const current = await readBlob()
+    current.checkins = current.checkins || {}
+    current.checkins[record.id] = record
+    await writeBlob(current)
+  } catch (e) {
+    console.warn('[ThreeMinds] JSONBlob write failed, saved locally only:', e.message)
   }
+
   return record
 }
 
 /* ─── DISTRESS ─────────────────────────────────────────── */
 
 export async function getDistress() {
-  if (dbConfigured()) {
-    try {
-      const res = await fetch(`${DB_URL}/distress.json`, { cache: 'no-store' })
-      const data = await res.json()
-      data ? lsSet(LS_DISTRESS, data) : localStorage.removeItem(LS_DISTRESS)
-      return data || null
-    } catch (e) {
-      console.warn('[ThreeMinds] Firebase distress read failed:', e.message)
-    }
+  try {
+    const data = await readBlob()
+    const distress = data.distress || null
+    distress ? lsSet(LS_DISTRESS, distress) : localStorage.removeItem(LS_DISTRESS)
+    return distress
+  } catch (e) {
+    console.warn('[ThreeMinds] JSONBlob distress read failed:', e.message)
+    return lsGet(LS_DISTRESS, 'null')
   }
-  return lsGet(LS_DISTRESS, 'null')
 }
 
 export async function setDistress(active) {
-  const data = active ? { active: true, timestamp: new Date().toISOString() } : null
-  data ? lsSet(LS_DISTRESS, data) : localStorage.removeItem(LS_DISTRESS)
+  const distressData = active ? { active: true, timestamp: new Date().toISOString() } : null
+  distressData ? lsSet(LS_DISTRESS, distressData) : localStorage.removeItem(LS_DISTRESS)
 
-  if (dbConfigured()) {
-    try {
-      if (active) {
-        await fetch(`${DB_URL}/distress.json`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        })
-      } else {
-        await fetch(`${DB_URL}/distress.json`, { method: 'DELETE' })
-      }
-    } catch (e) {
-      console.warn('[ThreeMinds] Firebase distress write failed:', e.message)
-    }
+  try {
+    const current = await readBlob()
+    current.distress = distressData
+    await writeBlob(current)
+  } catch (e) {
+    console.warn('[ThreeMinds] JSONBlob distress write failed:', e.message)
   }
 }
