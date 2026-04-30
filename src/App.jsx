@@ -1,41 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Dashboard from './components/Dashboard'
 import CheckIn from './components/CheckIn'
 import History from './components/History'
 import FamilyView from './components/FamilyView'
+import FamilyOnly from './components/FamilyOnly'
+
+// ── Detect view mode from URL ──────────────────────────────
+// Family share link:  /three-minds-wellness/?family
+// Darrian's link:     /three-minds-wellness/
+const IS_FAMILY = new URLSearchParams(window.location.search).has('family')
 
 const VIEWS = {
   DASHBOARD: 'dashboard',
   CHECKIN: 'checkin',
   HISTORY: 'history',
   FAMILY: 'family',
-}
-
-// Storage helpers
-export const getCheckins = () => {
-  try {
-    return JSON.parse(localStorage.getItem('tm_checkins') || '[]')
-  } catch { return [] }
-}
-
-export const saveCheckin = (checkin) => {
-  const checkins = getCheckins()
-  checkins.unshift({ ...checkin, id: Date.now(), timestamp: new Date().toISOString() })
-  localStorage.setItem('tm_checkins', JSON.stringify(checkins.slice(0, 90)))
-}
-
-export const getDistress = () => {
-  try {
-    return JSON.parse(localStorage.getItem('tm_distress') || 'null')
-  } catch { return null }
-}
-
-export const setDistress = (val) => {
-  if (val) {
-    localStorage.setItem('tm_distress', JSON.stringify({ active: true, timestamp: new Date().toISOString() }))
-  } else {
-    localStorage.removeItem('tm_distress')
-  }
 }
 
 export default function App() {
@@ -47,6 +26,17 @@ export default function App() {
     setTimeout(() => setToast(null), 3000)
   }
 
+  // ── Family-only mode: clean read-only view, no nav ────────
+  if (IS_FAMILY) {
+    return (
+      <div className="app-container">
+        {toast && <div className="toast">{toast}</div>}
+        <FamilyOnly showToast={showToast} />
+      </div>
+    )
+  }
+
+  // ── Darrian's full app ────────────────────────────────────
   return (
     <div className="app-container">
       {toast && <div className="toast">{toast}</div>}
@@ -92,8 +82,8 @@ export default function App() {
           className={`nav-btn ${view === VIEWS.FAMILY ? 'active' : ''}`}
           onClick={() => setView(VIEWS.FAMILY)}
         >
-          <span className="nav-icon">👥</span>
-          Family
+          <span className="nav-icon">👁️</span>
+          Preview
         </button>
       </nav>
     </div>
