@@ -7,6 +7,39 @@ const MINDS = {
   shika: { emoji: '🧠', name: 'Shikamaru', label: 'Logical Mind', color: '#52b788', desc: 'Strategic and in analysis mode.' },
 }
 
+// ── Athlete Profile — updated May 1, 2026 ─────────────────────────────
+const ATHLETE_PROFILE = {
+  height: '5\'10.5" (70.5")',
+  wingspan: '7\'10.5" (94.5")',
+  weight: '140 lbs',
+  weightGoal: '155+ lbs by Sept 2026',
+  standingVert: '36+ inches',
+  bodyFat: '~sub-8% (visible 8-pack)',
+  birthdate: 'Aug 25, 2003 (age 22)',
+  location: 'Atlanta, GA',
+  nextMilestone: 'G League Tryout — College Park Skyhawks (Sept 2026)',
+  euroEvent: 'Euro-Grades Las Vegas Combine (July 2026)',
+  academicNext: 'GT MSDA Online — Starting August 2026',
+}
+
+// ── Daily Nutrition Targets — Clean Bulk to 155 lbs ───────────────────
+// Goal: +15 lbs lean mass by September tryout (+500 cal/day surplus)
+const NUTRITION = {
+  calories: { target: 3300, label: 'Calories/day', note: '+500 surplus for lean bulk' },
+  protein:  { target: 195,  label: 'Protein (g)',  note: '~1.4g per lb bodyweight goal' },
+  carbs:    { target: 430,  label: 'Carbs (g)',    note: 'Fuel for 4-hr sessions' },
+  fats:     { target: 90,   label: 'Fats (g)',     note: 'Hormones + joint health' },
+  water:    { target: '1 gallon+', label: 'Water', note: 'Tendon & disc health' },
+  meals: [
+    { time: '7–8 AM',   name: 'Pre-Train',  items: 'Oats + banana + 2 eggs + protein shake (50g protein, 600 cal)' },
+    { time: '10 AM',    name: 'Mid-Workout',items: 'Gatorade/electrolytes + granola bar (simple carbs, 300 cal)' },
+    { time: '12–1 PM',  name: 'Post-Train', items: '6oz chicken/salmon + rice + broccoli + olive oil (50g protein, 800 cal)' },
+    { time: '3 PM',     name: 'Snack',      items: 'Greek yogurt + nuts + fruit (30g protein, 450 cal)' },
+    { time: '6–7 PM',   name: 'Dinner',     items: '8oz steak/ground beef or tilapia + sweet potato + veggies (50g protein, 850 cal)' },
+    { time: '9–10 PM',  name: 'Night',      items: 'Cottage cheese OR casein shake + PB (30g protein, 300 cal · slow-digest for overnight recovery)' },
+  ],
+}
+
 function getStatus(checkins) {
   if (!checkins.length) return 'unknown'
   const last = checkins[0]
@@ -203,6 +236,60 @@ export default function Dashboard({ onNavigate, VIEWS, showToast }) {
           </div>
         </div>
       )}
+
+      {/* ── Athlete Profile Card ───────────────────────────────────── */}
+      <div className="card">
+        <div className="card-title">🏀 Athlete Profile</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px', marginBottom: 14 }}>
+          {[
+            { label: 'HEIGHT', value: ATHLETE_PROFILE.height },
+            { label: 'WINGSPAN', value: ATHLETE_PROFILE.wingspan },
+            { label: 'WEIGHT NOW', value: ATHLETE_PROFILE.weight },
+            { label: 'WEIGHT GOAL', value: ATHLETE_PROFILE.weightGoal },
+            { label: 'STANDING VERT', value: ATHLETE_PROFILE.standingVert },
+            { label: 'BODY FAT', value: ATHLETE_PROFILE.bodyFat },
+          ].map(s => (
+            <div key={s.label}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>{s.label}</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, color: 'var(--luffy-secondary)', letterSpacing: 0.5, marginTop: 2 }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+        <hr style={{ border: 'none', borderTop: '1px solid var(--card-border)', margin: '10px 0' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+          <div>🎯 <strong>Next:</strong> {ATHLETE_PROFILE.nextMilestone}</div>
+          <div>🌍 <strong>Summer:</strong> {ATHLETE_PROFILE.euroEvent}</div>
+          <div>🎓 <strong>GT MSDA:</strong> {ATHLETE_PROFILE.academicNext}</div>
+        </div>
+      </div>
+
+      {/* ── Daily Nutrition Card ───────────────────────────────────── */}
+      <div className="card">
+        <div className="card-title">🍗 Daily Nutrition Targets</div>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 12 }}>
+          Clean bulk protocol — +15 lbs lean mass by Sept 2026 tryout.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+          {Object.values(NUTRITION).filter(v => v.label).map(macro => (
+            <div key={macro.label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: 'var(--gohan-secondary)' }}>{macro.target}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginTop: 2 }}>{macro.label}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-secondary)', marginTop: 3, opacity: 0.7 }}>{macro.note}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {NUTRITION.meals.map(meal => (
+            <div key={meal.time} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 12 }}>
+              <div style={{ minWidth: 58, color: 'var(--luffy-secondary)', fontWeight: 700, fontSize: 11 }}>{meal.time}</div>
+              <div>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginRight: 4 }}>{meal.name}:</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{meal.items}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="card">
         <div className="card-title">🆘 Need Support?</div>

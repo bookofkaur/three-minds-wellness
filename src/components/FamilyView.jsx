@@ -99,10 +99,28 @@ export default function FamilyView({ showToast }) {
   const [distress, setDistressState] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // ── Extracted load fn so it can be called by interval AND the refresh button.
+  // FamilyView previously loaded data only once on mount with no retry and no
+  // auto-refresh. If the initial JSONBlob fetch failed (common on mobile), the
+  // view stayed blank forever. Now it mirrors the FamilyOnly.jsx pattern.
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [c, d] = await Promise.all([getCheckins(), getDistress()])
+      setCheckins(c)
+      setDistressState(d)
+    } catch (e) {
+      console.warn('[ThreeMinds] FamilyView load error:', e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    Promise.all([getCheckins(), getDistress()]).then(([c, d]) => {
-      setCheckins(c); setDistressState(d); setLoading(false)
-    })
+    load()
+    // Auto-refresh every 60 s so the preview stays current without a manual reload.
+    const interval = setInterval(load, 60000)
+    return () => clearInterval(interval)
   }, [])
 
   const latest = checkins[0]
@@ -309,11 +327,19 @@ export default function FamilyView({ showToast }) {
         ))}
       </div>
 
+      <button className="btn-secondary" style={{ width: '100%', fontSize: 15, padding: '13px' }} onClick={load}>
+        🔄 Refresh Data
+      </button>
+
       {distress?.active && (
         <button className="btn-secondary" style={{ width: '100%', marginTop: 8, fontSize: 15, padding: '13px' }} onClick={clearDistress}>
           ✅ Darrian is okay — clear signal
         </button>
       )}
+
+      <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-secondary)', marginTop: 16, opacity: 0.5 }}>
+        Auto-refreshes every 60s · Data from JSONBlob
+      </p>
       <div style={{ height: 8 }} />
     </div>
   )
