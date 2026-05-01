@@ -17,16 +17,28 @@
 //
 //   If JSONBlob writes fail silently (no timeout, no retry), the data will
 //   only live in the writing device's localStorage. All other devices will
-//   see nothing. This was the root cause of the desktop-saves / mobile-blank bug.
+//   see nothing.
 //
-//   Fix embedded here: fetchWithTimeout + writeBlobWithRetry + readBlobWithRetry
-//   ensure that network failures are retried before falling back to cache.
+// ⚠️  BLOB EXPIRY RULE — READ THIS TOO:
 //
-// Blob ID: 019ddd44-3ab5-7590-8dec-b4f80a11210c
+//   JSONBlob.com expires blobs after ~30 days of inactivity. If the blob is
+//   gone (404), every device falls back to its own empty localStorage and
+//   shows nothing. This happened once already (old blob 019ddd44... expired).
+//
+//   Fix embedded here (two layers):
+//     1. fetchWithTimeout + withRetry: survive transient mobile network failures
+//     2. migrateLocalToBlob(): if a freshly-created blob is empty but this
+//        device's localStorage has check-ins, push them up immediately so
+//        all devices see the data again without manual re-entry.
+//
+//   If you ever create a new blob (POST /api/jsonBlob), update BLOB_ID below
+//   and the self-healing migration will take care of the rest on next load.
+//
+// Blob ID: 019de51c-cfaf-7299-8f2f-30500be073a9  (created May 1, 2026)
 // API:     GET/PUT https://jsonblob.com/api/jsonBlob/{ID}
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BLOB_ID = '019ddd44-3ab5-7590-8dec-b4f80a11210c'
+const BLOB_ID = '019de51c-cfaf-7299-8f2f-30500be073a9'
 const BLOB_URL = `https://jsonblob.com/api/jsonBlob/${BLOB_ID}`
 const HEADERS = { 'Content-Type': 'application/json', Accept: 'application/json' }
 
@@ -51,7 +63,6 @@ function lsSet(key, val) {
  * never completes. Any other device then reads an outdated or empty blob.
  *
  * FIX: Wrap every fetch in an AbortController with an 8-second timeout.
- * On mobile networks, 8s is generous but not so long that UX suffers.
  * ─────────────────────────────────────────────────────────────────────────── */
 async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
   const controller = new AbortController()
@@ -68,10 +79,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
 
 /* ─── retry with exponential backoff ─────────────────────────────────────────
  * WHY: Mobile connections are intermittent. A single retry after a short wait
- * recovers the majority of transient failures (e.g., 4G handoff, brief
- * signal loss). Without retry, one bad network moment = data loss.
- *
- * FIX: Up to MAX_RETRIES attempts with doubling delay between each.
+ * recovers the majority of transient failures (e.g., 4G handoff, signal loss).
  * ─────────────────────────────────────────────────────────────────────────── */
 const MAX_RETRIES = 3
 const RETRY_BASE_MS = 600
@@ -112,16 +120,62 @@ async function writeBlob(data) {
   if (!res.ok) throw new Error(`JSONBlob write failed: ${res.status}`)
 }
 
+/* ─── self-healing localStorage → blob migration ─────────────────────────────
+ * WHY: When a blob expires (or a new one is created after expiry), the blob
+ * starts empty. Any device that had check-ins cached in localStorage would
+ * keep showing them locally — but every OTHER device sees nothing.
+ *
+ * FIX: If the blob has no check-ins but this device's localStorage does, push
+ * localStorage data into the blob immediately. This restores cross-device sync
+ * without requiring the user to re-enter any data manually.
+ *
+ * This runs automatically inside getCheckins() whenever the blob is empty.
+ * It is safe to call repeatedly — subsequent calls find the blob non-empty
+ * and skip the migration.
+ * ─────────────────────────────────────────────────────────────────────────── */
+async function migrateLocalToBlob(currentBlobData) {
+  const cached = lsGet(LS_CHECKINS, '[]')
+  if (!cached || cached.length === 0) return currentBlobData // nothing to migrate
+
+  console.info(`[ThreeMinds] Blob is empty but localStorage has ${cached.length} check-ins — migrating to blob now...`)
+
+  // Convert cached array back to keyed object
+  const checkins = {}
+  cached.forEach(c => { checkins[c.id] = c })
+
+  const merged = { ...currentBlobData, checkins }
+
+  // Also restore distress if cached
+  const cachedDistress = lsGet(LS_DISTRESS, 'null')
+  if (cachedDistress) merged.distress = cachedDistress
+
+  try {
+    await withRetry(() => writeBlob(merged), 'migrateLocalToBlob')
+    console.info(`[ThreeMinds] Migration complete — ${cached.length} check-ins now in blob.`)
+    return merged
+  } catch (e) {
+    console.warn('[ThreeMinds] Migration write failed:', e.message)
+    return currentBlobData
+  }
+}
+
 /* ─── CHECKINS ─────────────────────────────────────────────────────────────── */
 
 export async function getCheckins() {
   try {
     // Always read from JSONBlob first — it is the only source of truth across devices.
     // localStorage is only used as an offline fallback (same device, no network).
-    const data = await withRetry(readBlob, 'getCheckins')
+    let data = await withRetry(readBlob, 'getCheckins')
+
+    // Self-healing: if blob has no check-ins, push up any localStorage data.
+    // This recovers from blob expiry without user intervention.
+    if (!data.checkins || Object.keys(data.checkins).length === 0) {
+      data = await migrateLocalToBlob(data)
+    }
+
     if (!data.checkins || typeof data.checkins !== 'object') return []
     const list = Object.values(data.checkins).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-    lsSet(LS_CHECKINS, list) // update local cache so offline fallback stays fresh
+    lsSet(LS_CHECKINS, list) // keep local cache fresh for offline fallback
     return list
   } catch (e) {
     console.warn('[ThreeMinds] JSONBlob read failed after retries, using local cache:', e.message)
@@ -140,14 +194,18 @@ export async function saveCheckin(checkin) {
   lsSet(LS_CHECKINS, [record, ...cached].slice(0, 90))
 
   try {
-    // Read → merge → write. Retried up to 3× to survive mobile network blips.
-    const current = await withRetry(readBlob, 'saveCheckin:read')
+    // Read → migrate if empty → merge new record → write.
+    let current = await withRetry(readBlob, 'saveCheckin:read')
+
+    // If blob is empty, migrate localStorage before adding new record
+    if (!current.checkins || Object.keys(current.checkins).length === 0) {
+      current = await migrateLocalToBlob(current)
+    }
+
     current.checkins = current.checkins || {}
     current.checkins[record.id] = record
     await withRetry(() => writeBlob(current), 'saveCheckin:write')
   } catch (e) {
-    // If all retries exhausted, data is local-only. The family view will NOT
-    // see this check-in until the next successful write to JSONBlob.
     console.warn('[ThreeMinds] JSONBlob write failed after retries — saved locally only:', e.message)
   }
 
