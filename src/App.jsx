@@ -4,6 +4,7 @@ import CheckIn from './components/CheckIn'
 import History from './components/History'
 import FamilyView from './components/FamilyView'
 import FamilyOnly from './components/FamilyOnly'
+import Todo from './components/Todo'
 
 // ── Detect view mode from URL ──────────────────────────────
 // Family share link:  /three-minds-wellness/?family
@@ -15,6 +16,7 @@ const VIEWS = {
   CHECKIN: 'checkin',
   HISTORY: 'history',
   FAMILY: 'family',
+  TODO: 'todo',
 }
 
 export default function App() {
@@ -23,7 +25,7 @@ export default function App() {
 
   const showToast = (msg) => {
     setToast(msg)
-    setTimeout(() => setToast(null), 3000)
+    setTimeout(() => setToast(null), 3500)
   }
 
   // ── Family-only mode: clean read-only view, no nav ────────
@@ -54,6 +56,9 @@ export default function App() {
         {view === VIEWS.FAMILY && (
           <FamilyView onNavigate={setView} VIEWS={VIEWS} showToast={showToast} />
         )}
+        {view === VIEWS.TODO && (
+          <Todo showToast={showToast} />
+        )}
       </main>
 
       <nav className="bottom-nav">
@@ -70,6 +75,13 @@ export default function App() {
         >
           <span className="nav-icon">✅</span>
           Check In
+        </button>
+        <button
+          className={`nav-btn ${view === VIEWS.TODO ? 'active' : ''}`}
+          onClick={() => setView(VIEWS.TODO)}
+        >
+          <span className="nav-icon">📋</span>
+          Tasks
         </button>
         <button
           className={`nav-btn ${view === VIEWS.HISTORY ? 'active' : ''}`}

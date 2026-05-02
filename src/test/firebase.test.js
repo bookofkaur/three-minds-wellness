@@ -93,13 +93,24 @@ describe('saveCheckin()', () => {
   })
 
   it('still returns record even when blob write fails', async () => {
-    // First call (readBlob) succeeds, second call (writeBlob) fails
+    // Clear local cache so the migration path (migrateLocalToBlob) is NOT triggered.
+    // migrateLocalToBlob only fires when the blob is empty AND localStorage has data;
+    // without this clear the leftover localStorage from earlier tests causes the
+    // migration to fire extra retries that blow past the default 5 s timeout.
+    localStorage.removeItem('tm_checkins')
+
+    // Read returns a non-empty blob (skips migration entirely).
+    // All subsequent write calls fail with 500 to exercise the error path.
     vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce({ ok: true, json: async () => EMPTY_BLOB })
-      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ checkins: { existing: { id: 1, mood: 7 } }, distress: null }),
+      })
+      .mockResolvedValue({ ok: false, status: 500, json: async () => ({}) })
+
     const result = await saveCheckin({ mood: 5, energy: 5, sleep: 5, mindState: 'shikamaru', notes: '' })
     expect(result).toHaveProperty('id')
-  })
+  }, 12000) // 3 write retries × (600 + 1200) ms = ~1800 ms — 12 s is generous headroom
 })
 
 describe('getDistress()', () => {

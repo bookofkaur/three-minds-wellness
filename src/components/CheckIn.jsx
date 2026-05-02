@@ -1,5 +1,37 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { saveCheckin } from '../firebase'
+
+// ── Free browser speech-to-text (no API key needed) ──────────────────────────
+function useSpeechToText({ onResult, onError }) {
+  const [listening, setListening] = useState(false)
+  const ref = useRef(null)
+  const supported =
+    typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+
+  const start = () => {
+    if (!supported) { onError?.('Voice input requires Chrome or Safari.'); return }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    const r = new SR()
+    r.lang = 'en-US'; r.interimResults = false; r.maxAlternatives = 1; r.continuous = false
+    r.onstart = () => setListening(true)
+    r.onend = () => setListening(false)
+    r.onerror = (e) => {
+      setListening(false)
+      if (e.error === 'not-allowed') onError?.('Mic permission denied — allow mic in browser settings.')
+      else if (e.error === 'no-speech') onError?.("Didn't catch that — try again.")
+      else onError?.(`Speech error: ${e.error}`)
+    }
+    r.onresult = (e) => {
+      const t = e.results[0]?.[0]?.transcript || ''
+      if (t.trim()) onResult?.(t.trim())
+    }
+    ref.current = r
+    r.start()
+  }
+  const stop = () => { ref.current?.stop(); setListening(false) }
+  return { listening, supported, start, stop }
+}
 
 const MINDS = [
   { id: 'gohan', emoji: '🔥', name: 'Gohan', subtitle: 'Emotional Mind', desc: 'Feelings are loud. Reactive, passionate, intense.', cls: 'selected-gohan' },
@@ -40,6 +72,15 @@ export default function CheckIn({ onNavigate, VIEWS, showToast }) {
   const [meds, setMeds] = useState(DEFAULT_MEDS)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // ── Voice-to-text for notes ─────────────────────────────────
+  const { listening: notesListening, supported: speechSupported, start: startNotes, stop: stopNotes } = useSpeechToText({
+    onResult: (text) => {
+      setNotes(prev => prev ? `${prev} ${text}` : text)
+      showToast('🎙️ Voice note added')
+    },
+    onError: (msg) => showToast(`⚠️ ${msg}`),
+  })
 
   const toggleMed = (id) => setMeds(prev => ({ ...prev, [id]: !prev[id] }))
 
@@ -158,11 +199,40 @@ export default function CheckIn({ onNavigate, VIEWS, showToast }) {
       </div>
 
       <div className="card">
-        <div className="card-title">📝 Notes (Optional)</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div className="card-title" style={{ marginBottom: 0 }}>📝 Notes (Optional)</div>
+          {speechSupported && (
+            <button
+              onClick={notesListening ? stopNotes : startNotes}
+              title={notesListening ? 'Stop recording' : 'Dictate note (free voice input)'}
+              style={{
+                width: 40, height: 40, borderRadius: 10, cursor: 'pointer', fontSize: 18,
+                border: `1px solid ${notesListening ? 'var(--red)' : 'var(--card-border)'}`,
+                background: notesListening ? 'rgba(230,57,70,0.2)' : 'rgba(255,255,255,0.05)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                animation: notesListening ? 'pulse-red 1.5s infinite' : 'none',
+                flexShrink: 0,
+              }}
+            >
+              {notesListening ? '⏹️' : '🎙️'}
+            </button>
+          )}
+        </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 12 }}>
-          What's on your mind? Racing thoughts, wins, worries — anything. This stays private to you.
+          What's on your mind? {speechSupported ? 'Tap 🎙️ to dictate or type below.' : 'Racing thoughts, wins, worries — anything.'} This stays private to you.
         </p>
-        <textarea rows={4} placeholder="Write freely. This is private..." value={notes} onChange={e => setNotes(e.target.value)} />
+        {notesListening && (
+          <div style={{ fontSize: 12, color: 'var(--red)', fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>
+            🎙️ Listening — speak now...
+          </div>
+        )}
+        <textarea
+          rows={4}
+          placeholder={notesListening ? '🎙️ Listening...' : 'Write freely. This is private...'}
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          style={{ borderColor: notesListening ? 'var(--red)' : undefined }}
+        />
       </div>
 
       <button className="btn-primary" onClick={handleSubmit} disabled={saving} style={{ opacity: saving ? 0.7 : 1 }}>

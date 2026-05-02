@@ -42,7 +42,7 @@ body {
   flex-direction: column;
 }
 
-/* Navigation */
+/* Navigation — 5 tabs */
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -54,7 +54,7 @@ body {
   border-top: 1px solid var(--card-border);
   display: flex;
   justify-content: space-around;
-  padding: 10px 0 20px;
+  padding: 8px 4px 18px;
   z-index: 100;
 }
 
@@ -65,14 +65,16 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   font-family: var(--font-body);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 12px;
+  padding: 5px 8px;
+  border-radius: 10px;
   transition: all 0.2s;
+  flex: 1;
+  min-width: 0;
 }
 
 .nav-btn.active {
@@ -81,7 +83,7 @@ body {
 }
 
 .nav-btn .nav-icon {
-  font-size: 22px;
+  font-size: 20px;
 }
 
 /* Page layout */

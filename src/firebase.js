@@ -238,3 +238,79 @@ export async function setDistress(active) {
     console.warn('[ThreeMinds] JSONBlob distress write failed after retries:', e.message)
   }
 }
+
+/* ─── TODOS ─────────────────────────────────────────────────────────────────
+ * Todos are stored in the blob under the `todos` key, same pattern as
+ * checkins — keyed by id for O(1) lookup and conflict-free merging.
+ * localStorage key: tm_todos (offline cache)
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+const LS_TODOS = 'tm_todos'
+
+export async function getTodos() {
+  try {
+    const data = await withRetry(readBlob, 'getTodos')
+    if (!data.todos || typeof data.todos !== 'object') return []
+    const list = Object.values(data.todos).sort((a, b) => {
+      // Active first, then by timestamp descending
+      if (a.done !== b.done) return a.done ? 1 : -1
+      return new Date(b.timestamp) - new Date(a.timestamp)
+    })
+    lsSet(LS_TODOS, list)
+    return list
+  } catch (e) {
+    console.warn('[ThreeMinds] getTodos failed after retries:', e.message)
+    return lsGet(LS_TODOS, '[]')
+  }
+}
+
+export async function saveTodo(todo) {
+  const record = { ...todo, id: `todo_${Date.now()}`, timestamp: new Date().toISOString() }
+
+  // Optimistic local update
+  const cached = lsGet(LS_TODOS, '[]')
+  lsSet(LS_TODOS, [record, ...cached])
+
+  try {
+    const current = await withRetry(readBlob, 'saveTodo:read')
+    current.todos = current.todos || {}
+    current.todos[record.id] = record
+    await withRetry(() => writeBlob(current), 'saveTodo:write')
+  } catch (e) {
+    console.warn('[ThreeMinds] saveTodo write failed after retries:', e.message)
+  }
+
+  return record
+}
+
+export async function toggleTodo(id, done) {
+  // Optimistic local update
+  const cached = lsGet(LS_TODOS, '[]')
+  lsSet(LS_TODOS, cached.map(t => t.id === id ? { ...t, done } : t))
+
+  try {
+    const current = await withRetry(readBlob, 'toggleTodo:read')
+    if (current.todos?.[id]) {
+      current.todos[id].done = done
+      await withRetry(() => writeBlob(current), 'toggleTodo:write')
+    }
+  } catch (e) {
+    console.warn('[ThreeMinds] toggleTodo failed after retries:', e.message)
+  }
+}
+
+export async function deleteTodo(id) {
+  // Optimistic local update
+  const cached = lsGet(LS_TODOS, '[]')
+  lsSet(LS_TODOS, cached.filter(t => t.id !== id))
+
+  try {
+    const current = await withRetry(readBlob, 'deleteTodo:read')
+    if (current.todos?.[id]) {
+      delete current.todos[id]
+      await withRetry(() => writeBlob(current), 'deleteTodo:write')
+    }
+  } catch (e) {
+    console.warn('[ThreeMinds] deleteTodo failed after retries:', e.message)
+  }
+}
