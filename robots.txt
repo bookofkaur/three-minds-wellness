@@ -1,0 +1,8 @@
+# Three Minds Wellness — robots.txt
+# https://bookofkaur.github.io/three-minds-wellness/
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://bookofkaur.github.io/three-minds-wellness/sitemap.xml
