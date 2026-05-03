@@ -314,3 +314,23 @@ export async function deleteTodo(id) {
     console.warn('[ThreeMinds] deleteTodo failed after retries:', e.message)
   }
 }
+
+/* ─── updateTodo — patch arbitrary fields on an existing todo ────────────────
+ * Used for dueToday / estimatedMinutes toggles that don't change done state.
+ * Merges the patch object into the existing record in-place (same id preserved).
+ * ─────────────────────────────────────────────────────────────────────────── */
+export async function updateTodo(id, patch) {
+  // Optimistic local update
+  const cached = lsGet(LS_TODOS, '[]')
+  lsSet(LS_TODOS, cached.map(t => t.id === id ? { ...t, ...patch } : t))
+
+  try {
+    const current = await withRetry(readBlob, 'updateTodo:read')
+    if (current.todos?.[id]) {
+      current.todos[id] = { ...current.todos[id], ...patch }
+      await withRetry(() => writeBlob(current), 'updateTodo:write')
+    }
+  } catch (e) {
+    console.warn('[ThreeMinds] updateTodo failed after retries:', e.message)
+  }
+}
